@@ -41,7 +41,15 @@ const STATIC_BOOKS: Book[] = allBooksData.books.map((b: any) => {
     };
 });
 
-export default function StudentCatalog() {
+export default function StudentCatalogPage() {
+    return (
+        <React.Suspense fallback={null}>
+            <StudentCatalog />
+        </React.Suspense>
+    );
+}
+
+function StudentCatalog() {
     const { user } = useAuth();
     const searchParams = useSearchParams();
     const [q, setQ] = React.useState(searchParams.get("q") ?? "");

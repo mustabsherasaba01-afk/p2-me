@@ -25,6 +25,14 @@ type ThesisTxn = {
 };
 
 export default function Page() {
+  return (
+    <ConsoleShell title="Thesis Records" subtitle="All thesis issue and return transactions.">
+      <RecordsContent />
+    </ConsoleShell>
+  );
+}
+
+function RecordsContent() {
   const { search } = useConsole();
   const [records, setRecords] = React.useState<ThesisTxn[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -76,69 +84,67 @@ export default function Page() {
   const open = filtered.filter((r) => r.status === "open" || r.status === "overdue").length;
 
   return (
-    <ConsoleShell title="Thesis Records" subtitle="All thesis issue and return transactions.">
-      <Card title="Thesis Transactions" right={<Badge text={`${open} open`} />}>
-        {loading ? (
-          <div className="py-8 text-center text-sm text-slate-400">Loading records…</div>
-        ) : filtered.length === 0 ? (
-          <div className="py-8 text-center text-sm text-slate-400">No thesis transactions yet.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[700px]">
-              <thead>
-                <tr className="text-xs text-slate-500">
-                  <th className="text-left font-medium py-2">Thesis</th>
-                  <th className="text-left font-medium py-2">Member</th>
-                  <th className="text-left font-medium py-2">Issued</th>
-                  <th className="text-left font-medium py-2">Due</th>
-                  <th className="text-left font-medium py-2">Returned</th>
-                  <th className="text-left font-medium py-2">Status</th>
-                  <th className="text-left font-medium py-2" />
+    <Card title="Thesis Transactions" right={<Badge text={`${open} open`} />}>
+      {loading ? (
+        <div className="py-8 text-center text-sm text-slate-400">Loading records…</div>
+      ) : filtered.length === 0 ? (
+        <div className="py-8 text-center text-sm text-slate-400">No thesis transactions yet.</div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[700px]">
+            <thead>
+              <tr className="text-xs text-slate-500">
+                <th className="text-left font-medium py-2">Thesis</th>
+                <th className="text-left font-medium py-2">Member</th>
+                <th className="text-left font-medium py-2">Issued</th>
+                <th className="text-left font-medium py-2">Due</th>
+                <th className="text-left font-medium py-2">Returned</th>
+                <th className="text-left font-medium py-2">Status</th>
+                <th className="text-left font-medium py-2" />
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {filtered.map((r) => (
+                <tr key={r.id} className="text-slate-700">
+                  <td className="py-2">
+                    <div className="font-medium text-slate-900">{r.thesisTitle}</div>
+                    <div className="text-xs text-slate-500">{r.thesisId}</div>
+                  </td>
+                  <td className="py-2">
+                    <div>{r.studentName}</div>
+                    <div className="text-xs text-slate-500">{r.studentUniId}</div>
+                  </td>
+                  <td className="py-2 text-xs">{fmt(r.issuedAt)}</td>
+                  <td className="py-2 text-xs">{fmt(r.dueDate)}</td>
+                  <td className="py-2 text-xs">{fmt(r.returnedAt)}</td>
+                  <td className="py-2">
+                    <span className={[
+                      "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
+                      r.status === "open" ? "bg-blue-50 text-blue-700" :
+                      r.status === "returned" ? "bg-emerald-50 text-emerald-700" :
+                      "bg-rose-50 text-rose-700",
+                    ].join(" ")}>
+                      {r.status === "returned" && r.fine > 0 ? `PKR ${r.fine}` : r.status}
+                    </span>
+                  </td>
+                  <td className="py-2">
+                    {r.status === "open" && (
+                      <button
+                        onClick={() => handleReturn(r)}
+                        disabled={returning === r.id}
+                        className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 px-2 py-1 text-xs font-medium disabled:opacity-50"
+                      >
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        {returning === r.id ? "…" : "Return"}
+                      </button>
+                    )}
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y">
-                {filtered.map((r) => (
-                  <tr key={r.id} className="text-slate-700">
-                    <td className="py-2">
-                      <div className="font-medium text-slate-900">{r.thesisTitle}</div>
-                      <div className="text-xs text-slate-500">{r.thesisId}</div>
-                    </td>
-                    <td className="py-2">
-                      <div>{r.studentName}</div>
-                      <div className="text-xs text-slate-500">{r.studentUniId}</div>
-                    </td>
-                    <td className="py-2 text-xs">{fmt(r.issuedAt)}</td>
-                    <td className="py-2 text-xs">{fmt(r.dueDate)}</td>
-                    <td className="py-2 text-xs">{fmt(r.returnedAt)}</td>
-                    <td className="py-2">
-                      <span className={[
-                        "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
-                        r.status === "open" ? "bg-blue-50 text-blue-700" :
-                        r.status === "returned" ? "bg-emerald-50 text-emerald-700" :
-                        "bg-rose-50 text-rose-700",
-                      ].join(" ")}>
-                        {r.status === "returned" && r.fine > 0 ? `PKR ${r.fine}` : r.status}
-                      </span>
-                    </td>
-                    <td className="py-2">
-                      {r.status === "open" && (
-                        <button
-                          onClick={() => handleReturn(r)}
-                          disabled={returning === r.id}
-                          className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 px-2 py-1 text-xs font-medium disabled:opacity-50"
-                        >
-                          <CheckCircle2 className="h-3.5 w-3.5" />
-                          {returning === r.id ? "…" : "Return"}
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
-    </ConsoleShell>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Card>
   );
 }
