@@ -8,6 +8,7 @@ import allBooksData from "../../all_library_books.json";
 import { collection, onSnapshot, orderBy, query, addDoc, Timestamp } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import { useAuth } from "../../lib/authContext";
+import { useSearchParams } from "next/navigation";
 
 type Book = {
     isbn: string;
@@ -42,7 +43,8 @@ const STATIC_BOOKS: Book[] = allBooksData.books.map((b: any) => {
 
 export default function StudentCatalog() {
     const { user } = useAuth();
-    const [q, setQ] = React.useState("");
+    const searchParams = useSearchParams();
+    const [q, setQ] = React.useState(searchParams.get("q") ?? "");
     const [category, setCategory] = React.useState("All");
     const [currentPage, setCurrentPage] = React.useState(1);
     const [firestoreBooks, setFirestoreBooks] = React.useState<Book[]>([]);
