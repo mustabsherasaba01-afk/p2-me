@@ -5,8 +5,9 @@ import StudentShell from "../_components/StudentShell";
 import { Card, Badge } from "../../(console)/_components/ui";
 import { Search, ArrowUpRight, BookOpen, Layers, Bookmark, Sparkles } from "lucide-react";
 import allBooksData from "../../all_library_books.json";
-import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
+import { collection, onSnapshot, orderBy, query, addDoc, Timestamp } from "firebase/firestore";
 import { db } from "../../lib/firebase";
+import { useAuth } from "../../lib/authContext";
 
 type Book = {
     isbn: string;
@@ -40,10 +41,13 @@ const STATIC_BOOKS: Book[] = allBooksData.books.map((b: any) => {
 });
 
 export default function StudentCatalog() {
+    const { user } = useAuth();
     const [q, setQ] = React.useState("");
     const [category, setCategory] = React.useState("All");
     const [currentPage, setCurrentPage] = React.useState(1);
     const [firestoreBooks, setFirestoreBooks] = React.useState<Book[]>([]);
+    const [bookingBook, setBookingBook] = React.useState<string | null>(null);
+    const [bookingSuccess, setBookingSuccess] = React.useState("");
     const itemsPerPage = 12;
 
     React.useEffect(() => {
@@ -88,11 +92,43 @@ export default function StudentCatalog() {
 
     const [selectedBook, setSelectedBook] = React.useState<any>(null);
 
+    async function handlePreBook(book: Book) {
+        if (!user || user.role !== "student") return;
+        setBookingBook(book.isbn);
+        setBookingSuccess("");
+        try {
+            await addDoc(collection(db, "bookings"), {
+                studentDocId: user.id,
+                studentName: user.name,
+                studentUniId: user.studentId,
+                bookIsbn: book.isbn,
+                bookTitle: book.title,
+                bookAuthor: book.author,
+                requestedAt: Timestamp.now(),
+                status: "pending",
+            });
+            setBookingSuccess(`Pre-book request sent for "${book.title}". The librarian will confirm your request.`);
+            setSelectedBook(null);
+        } catch {
+            setBookingSuccess("Failed to send request. Please try again.");
+        } finally {
+            setBookingBook(null);
+        }
+    }
+
     return (
         <StudentShell
             title="Library Catalog"
             subtitle="Search and explore thousands of free resources."
         >
+            {/* Booking toast */}
+            {bookingSuccess && (
+                <div className="mb-4 p-4 rounded-2xl bg-emerald-50 border border-emerald-100 text-sm font-bold text-emerald-700 flex items-center justify-between">
+                    <span>{bookingSuccess}</span>
+                    <button onClick={() => setBookingSuccess("")} className="ml-4 text-emerald-500 hover:text-emerald-700 text-lg leading-none">&times;</button>
+                </div>
+            )}
+
             {/* Search & Filter Header */}
             <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-4 mb-8">
                 <div className="md:col-span-2 lg:col-span-3 relative">
@@ -269,8 +305,16 @@ export default function StudentCatalog() {
                                 </div>
 
                                 <div className="flex gap-4">
-                                    <button className="flex-1 bg-slate-900 text-white font-black py-4 rounded-2xl hover:bg-black transition-all shadow-xl shadow-slate-900/20 active:scale-95 disabled:opacity-30 disabled:hover:bg-slate-900" disabled={selectedBook.available <= 0}>
-                                        {selectedBook.available > 0 ? "PRE-BOOK THIS COPY" : "NOT AVAILABLE"}
+                                    <button
+                                        onClick={() => handlePreBook(selectedBook)}
+                                        disabled={selectedBook.available <= 0 || bookingBook === selectedBook.isbn}
+                                        className="flex-1 bg-slate-900 text-white font-black py-4 rounded-2xl hover:bg-black transition-all shadow-xl shadow-slate-900/20 active:scale-95 disabled:opacity-30 disabled:hover:bg-slate-900"
+                                    >
+                                        {bookingBook === selectedBook.isbn
+                                            ? "Sending Request…"
+                                            : selectedBook.available > 0
+                                            ? "PRE-BOOK THIS COPY"
+                                            : "NOT AVAILABLE"}
                                     </button>
                                     <button className="p-4 bg-white border border-slate-200 rounded-2xl text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all active:scale-95">
                                         <Bookmark className="h-6 w-6" />

@@ -132,8 +132,8 @@ export default function StudentShell({
                             S
                         </div>
                         <div className="leading-tight">
-                            <div className="font-black text-lg tracking-tight">KIPS STUDENT</div>
-                            <div className="text-[10px] font-bold text-indigo-300 uppercase tracking-widest">Digital Library</div>
+                            <div className="font-black text-lg tracking-tight">Student Library</div>
+                            <div className="text-[10px] font-bold text-indigo-300 uppercase tracking-widest">LSIT Portal</div>
                         </div>
 
                         {!isDesktop && (
