@@ -304,8 +304,8 @@ export default function Page() {
       });
       setSuccess(`"${form.title}" added to the library.`);
       setForm({ isbn: "", title: "", author: "", publisher: "", year: "", category: "Fiction", copies: "1", shelf: "", notes: "" });
-    } catch {
-      setError("Failed to save book. Please try again.");
+    } catch (err: any) {
+      setError(`Failed to save book: ${err?.message || "Please try again."}`);
     } finally {
       setSaving(false);
     }

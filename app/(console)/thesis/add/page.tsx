@@ -55,8 +55,8 @@ export default function Page() {
       });
       setSuccess(`Thesis "${form.title}" added successfully.`);
       setForm(EMPTY);
-    } catch {
-      setError("Failed to save thesis. Please try again.");
+    } catch (err: any) {
+      setError(`Failed to save thesis: ${err?.message || "Please try again."}`);
     } finally {
       setSubmitting(false);
     }

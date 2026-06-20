@@ -68,8 +68,8 @@ export default function Page() {
 
       setSuccess(`Member "${form.name}" added. They can now log in with ID and Password.`);
       setForm({ studentId: "", name: "", type: "Student", department: "", email: "", phone: "", address: "", password: "" });
-    } catch (err) {
-      setError("Failed to create member. Please try again.");
+    } catch (err: any) {
+      setError(`Failed to create member: ${err?.message || "Please try again."}`);
       console.error(err);
     } finally {
       setSaving(false);

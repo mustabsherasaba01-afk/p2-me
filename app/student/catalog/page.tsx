@@ -119,8 +119,8 @@ function StudentCatalog() {
             });
             setBookingSuccess(`Pre-book request sent for "${book.title}". The librarian will confirm your request.`);
             setSelectedBook(null);
-        } catch {
-            setBookingSuccess("Failed to send request. Please try again.");
+        } catch (err: any) {
+            setBookingSuccess(`Failed to send request: ${err?.message || "Please try again."}`);
         } finally {
             setBookingBook(null);
         }
