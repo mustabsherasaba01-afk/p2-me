@@ -27,7 +27,7 @@ type Notif = {
     bookTitle: string;
     bookIsbn: string;
     dueDate: { seconds: number };
-    type: "overdue" | "due-soon";
+    urgency: "overdue" | "due-soon" | "active";
     daysLeft: number;
 };
 
@@ -37,29 +37,36 @@ function NotificationPanel({ userId }: { userId: string }) {
     const ref = React.useRef<HTMLDivElement>(null);
 
     React.useEffect(() => {
+        // Single-field query — no composite index needed; status filtering done client-side.
         const q = query(
             collection(db, "transactions"),
-            where("studentDocId", "==", userId),
-            where("status", "==", "active")
+            where("studentDocId", "==", userId)
         );
         return onSnapshot(q, (snap) => {
             const now = new Date();
-            const threeDays = 3 * 24 * 60 * 60 * 1000;
+            const sevenDays = 7 * 24 * 60 * 60 * 1000;
             const results: Notif[] = [];
             snap.docs.forEach((d) => {
                 const data = d.data();
-                if (!data.dueDate) return;
+                if (data.status !== "active" || !data.dueDate) return;
                 const due = new Date(data.dueDate.seconds * 1000);
                 const diff = due.getTime() - now.getTime();
                 const daysLeft = Math.ceil(diff / (24 * 60 * 60 * 1000));
-                if (diff < 0) {
-                    results.push({ id: d.id, bookTitle: data.bookTitle, bookIsbn: data.bookIsbn, dueDate: data.dueDate, type: "overdue", daysLeft });
-                } else if (diff <= threeDays) {
-                    results.push({ id: d.id, bookTitle: data.bookTitle, bookIsbn: data.bookIsbn, dueDate: data.dueDate, type: "due-soon", daysLeft });
-                }
+                const urgency: Notif["urgency"] =
+                    diff < 0 ? "overdue" :
+                    diff <= sevenDays ? "due-soon" :
+                    "active";
+                results.push({ id: d.id, bookTitle: data.bookTitle, bookIsbn: data.bookIsbn, dueDate: data.dueDate, urgency, daysLeft });
             });
-            results.sort((a, b) => a.daysLeft - b.daysLeft);
+            // Sort: overdue first, then due-soon, then active; within each group by daysLeft
+            results.sort((a, b) => {
+                const order = { overdue: 0, "due-soon": 1, active: 2 };
+                if (order[a.urgency] !== order[b.urgency]) return order[a.urgency] - order[b.urgency];
+                return a.daysLeft - b.daysLeft;
+            });
             setNotifs(results);
+        }, (err) => {
+            console.error("Notification query failed:", err);
         });
     }, [userId]);
 
@@ -75,6 +82,8 @@ function NotificationPanel({ userId }: { userId: string }) {
         return new Date(ts.seconds * 1000).toLocaleDateString("en-PK", { day: "numeric", month: "short" });
     }
 
+    const urgentCount = notifs.filter((n) => n.urgency !== "active").length;
+
     return (
         <div ref={ref} className="relative">
             <button
@@ -83,7 +92,10 @@ function NotificationPanel({ userId }: { userId: string }) {
             >
                 <Bell className="h-5 w-5" />
                 {notifs.length > 0 && (
-                    <span className="absolute top-1.5 right-1.5 min-w-[16px] h-4 bg-rose-500 rounded-full ring-2 ring-white text-[9px] font-black text-white flex items-center justify-center px-0.5">
+                    <span className={cn(
+                        "absolute top-1.5 right-1.5 min-w-[16px] h-4 rounded-full ring-2 ring-white text-[9px] font-black text-white flex items-center justify-center px-0.5",
+                        urgentCount > 0 ? "bg-rose-500" : "bg-indigo-500"
+                    )}>
                         {notifs.length}
                     </span>
                 )}
@@ -92,9 +104,14 @@ function NotificationPanel({ userId }: { userId: string }) {
             {open && (
                 <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl border border-slate-200 shadow-2xl shadow-slate-200/60 z-50 overflow-hidden">
                     <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-                        <span className="text-sm font-black text-slate-900">Notifications</span>
+                        <span className="text-sm font-black text-slate-900">My Books</span>
                         {notifs.length > 0 && (
-                            <span className="text-[10px] font-black text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full">{notifs.length} alert{notifs.length !== 1 ? "s" : ""}</span>
+                            <span className={cn(
+                                "text-[10px] font-black px-2 py-0.5 rounded-full",
+                                urgentCount > 0 ? "text-rose-600 bg-rose-50" : "text-indigo-600 bg-indigo-50"
+                            )}>
+                                {urgentCount > 0 ? `${urgentCount} urgent` : `${notifs.length} active`}
+                            </span>
                         )}
                     </div>
 
@@ -102,28 +119,47 @@ function NotificationPanel({ userId }: { userId: string }) {
                         {notifs.length === 0 ? (
                             <div className="py-10 flex flex-col items-center gap-2 text-slate-400">
                                 <CheckCircle2 className="h-8 w-8 text-emerald-400" />
-                                <p className="text-sm font-bold">All caught up!</p>
-                                <p className="text-xs">No overdue or upcoming returns.</p>
+                                <p className="text-sm font-bold">No active loans</p>
+                                <p className="text-xs">You have no books currently issued.</p>
                             </div>
                         ) : (
-                            notifs.map((n) => (
-                                <div key={n.id} className={cn("px-4 py-3 flex items-start gap-3", n.type === "overdue" ? "bg-rose-50/60" : "bg-amber-50/60")}>
-                                    <div className={cn("mt-0.5 h-8 w-8 rounded-xl grid place-items-center flex-shrink-0", n.type === "overdue" ? "bg-rose-100 text-rose-600" : "bg-amber-100 text-amber-600")}>
-                                        {n.type === "overdue" ? <AlertTriangle className="h-4 w-4" /> : <Clock className="h-4 w-4" />}
+                            notifs.map((n) => {
+                                const isOverdue = n.urgency === "overdue";
+                                const isDueSoon = n.urgency === "due-soon";
+                                return (
+                                    <div key={n.id} className={cn(
+                                        "px-4 py-3 flex items-start gap-3",
+                                        isOverdue ? "bg-rose-50/60" : isDueSoon ? "bg-amber-50/60" : ""
+                                    )}>
+                                        <div className={cn(
+                                            "mt-0.5 h-8 w-8 rounded-xl grid place-items-center flex-shrink-0",
+                                            isOverdue ? "bg-rose-100 text-rose-600" :
+                                            isDueSoon ? "bg-amber-100 text-amber-600" :
+                                            "bg-indigo-50 text-indigo-500"
+                                        )}>
+                                            {isOverdue ? <AlertTriangle className="h-4 w-4" /> :
+                                             isDueSoon ? <Clock className="h-4 w-4" /> :
+                                             <BookOpen className="h-4 w-4" />}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-xs font-black text-slate-900 truncate">{n.bookTitle}</p>
+                                            <p className="text-[10px] text-slate-500 mt-0.5">Accession: {n.bookIsbn}</p>
+                                            <p className={cn(
+                                                "text-[11px] font-bold mt-1",
+                                                isOverdue ? "text-rose-600" :
+                                                isDueSoon ? "text-amber-700" :
+                                                "text-indigo-600"
+                                            )}>
+                                                {isOverdue
+                                                    ? `Overdue by ${Math.abs(n.daysLeft)} day${Math.abs(n.daysLeft) !== 1 ? "s" : ""} — PKR ${Math.abs(n.daysLeft) * 50} fine`
+                                                    : n.daysLeft === 0
+                                                    ? "Due today!"
+                                                    : `Due ${fmt(n.dueDate)} (${n.daysLeft}d)`}
+                                            </p>
+                                        </div>
                                     </div>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-xs font-black text-slate-900 truncate">{n.bookTitle}</p>
-                                        <p className="text-[10px] text-slate-500 mt-0.5">Accession: {n.bookIsbn}</p>
-                                        <p className={cn("text-[11px] font-bold mt-1", n.type === "overdue" ? "text-rose-600" : "text-amber-700")}>
-                                            {n.type === "overdue"
-                                                ? `Overdue by ${Math.abs(n.daysLeft)} day${Math.abs(n.daysLeft) !== 1 ? "s" : ""} — PKR ${Math.abs(n.daysLeft) * 50} fine`
-                                                : n.daysLeft === 0
-                                                ? "Due today!"
-                                                : `Due in ${n.daysLeft} day${n.daysLeft !== 1 ? "s" : ""} — ${fmt(n.dueDate)}`}
-                                        </p>
-                                    </div>
-                                </div>
-                            ))
+                                );
+                            })
                         )}
                     </div>
 
