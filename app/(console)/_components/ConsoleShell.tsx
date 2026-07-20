@@ -6,10 +6,13 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   Activity, Bell, BookPlus, Boxes, ChevronDown, ClipboardCheck,
   Filter, GraduationCap, LayoutGrid, LogOut, Menu, Search, Settings, Users, X,
+  BookMarked, Check, Trash2,
 } from "lucide-react";
 import { cn } from "./ui";
 import { ConsoleProvider, useConsole } from "./ConsoleContext";
 import { useAuth } from "../../lib/authContext";
+import { collection, query, where, onSnapshot, updateDoc, doc, Timestamp } from "firebase/firestore";
+import { db } from "../../lib/firebase";
 
 /* ── child components that consume ConsoleContext ── */
 
@@ -26,6 +29,145 @@ function SideLink({ href, icon, label, onClick }: { href: string; icon: React.Re
       <span className={cn(active ? "text-sky-800" : "text-white/90")}>{icon}</span>
       <span className="flex-1 text-left">{label}</span>
     </Link>
+  );
+}
+
+/* ── Admin notification bell (pre-book requests) ── */
+
+type Booking = {
+  id: string;
+  studentName: string;
+  studentUniId: string;
+  bookTitle: string;
+  bookIsbn: string;
+  requestedAt: { seconds: number } | null;
+  status: string;
+};
+
+function AdminNotificationBell() {
+  const [open, setOpen] = React.useState(false);
+  const [bookings, setBookings] = React.useState<Booking[]>([]);
+  const ref = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    // Single-field query to avoid needing a composite index
+    const q = query(collection(db, "bookings"), where("status", "==", "pending"));
+    return onSnapshot(q, (snap) => {
+      setBookings(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Booking)));
+    }, (err) => {
+      console.error("Admin notification query failed:", err);
+    });
+  }, []);
+
+  React.useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  async function approve(b: Booking) {
+    await updateDoc(doc(db, "bookings", b.id), {
+      status: "approved",
+      respondedAt: Timestamp.now(),
+    });
+  }
+
+  async function dismiss(b: Booking) {
+    await updateDoc(doc(db, "bookings", b.id), {
+      status: "rejected",
+      respondedAt: Timestamp.now(),
+    });
+  }
+
+  function fmt(ts: { seconds: number } | null) {
+    if (!ts) return "";
+    return new Date(ts.seconds * 1000).toLocaleDateString("en-PK", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  }
+
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <button
+        onClick={() => setOpen((p) => !p)}
+        style={{ position: "relative", border: "1px solid #e2e8f0", borderRadius: 20, padding: 8, background: "white", cursor: "pointer" }}
+      >
+        <Bell size={15} color="#475569" />
+        {bookings.length > 0 && (
+          <span style={{
+            position: "absolute", top: 2, right: 2,
+            minWidth: 16, height: 16, borderRadius: "50%",
+            background: "#ef4444", color: "white",
+            fontSize: 9, fontWeight: 800,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            border: "2px solid white", padding: "0 2px",
+          }}>
+            {bookings.length}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div style={{
+          position: "absolute", right: 0, top: "calc(100% + 8px)",
+          width: 320, background: "white", borderRadius: 16,
+          border: "1px solid #e2e8f0", boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
+          zIndex: 100, overflow: "hidden",
+        }}>
+          {/* Header */}
+          <div style={{ padding: "12px 16px", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>Pre-Book Requests</span>
+            {bookings.length > 0 && (
+              <span style={{ fontSize: 10, fontWeight: 700, color: "#dc2626", background: "#fef2f2", padding: "2px 8px", borderRadius: 999 }}>
+                {bookings.length} pending
+              </span>
+            )}
+          </div>
+
+          {/* List */}
+          <div style={{ maxHeight: 340, overflowY: "auto" }}>
+            {bookings.length === 0 ? (
+              <div style={{ padding: "32px 16px", textAlign: "center", color: "#94a3b8", fontSize: 13 }}>
+                <BookMarked size={28} style={{ margin: "0 auto 8px", color: "#cbd5e1" }} />
+                <p style={{ margin: 0, fontWeight: 600 }}>No pending requests</p>
+                <p style={{ margin: "4px 0 0", fontSize: 11 }}>Students' pre-book requests appear here.</p>
+              </div>
+            ) : (
+              bookings.map((b) => (
+                <div key={b.id} style={{ padding: "12px 16px", borderBottom: "1px solid #f8fafc", background: "#fffbeb" }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                    <div style={{ width: 32, height: 32, borderRadius: 10, background: "#fef3c7", display: "grid", placeItems: "center", flexShrink: 0 }}>
+                      <BookMarked size={15} color="#d97706" />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.bookTitle}</p>
+                      <p style={{ margin: "2px 0 0", fontSize: 11, color: "#64748b" }}>
+                        <span style={{ fontWeight: 600 }}>{b.studentName}</span> · {b.studentUniId}
+                      </p>
+                      <p style={{ margin: "2px 0 0", fontSize: 10, color: "#94a3b8" }}>{fmt(b.requestedAt)}</p>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+                    <button
+                      onClick={() => approve(b)}
+                      style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 4, padding: "5px 0", borderRadius: 8, border: "none", background: "#dcfce7", color: "#16a34a", fontSize: 11, fontWeight: 700, cursor: "pointer" }}
+                    >
+                      <Check size={12} /> Approve
+                    </button>
+                    <button
+                      onClick={() => dismiss(b)}
+                      style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 4, padding: "5px 0", borderRadius: 8, border: "none", background: "#fee2e2", color: "#dc2626", fontSize: 11, fontWeight: 700, cursor: "pointer" }}
+                    >
+                      <Trash2 size={12} /> Reject
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -72,9 +214,7 @@ function TopBar({ title, subtitle, rightActions, onHamburger, isDesktop, adminEm
             style={{ display: "flex", alignItems: "center", gap: 6, border: "1px solid #e2e8f0", borderRadius: 20, padding: "8px 12px", background: "white", cursor: "pointer", fontSize: 13, color: "#475569" }}>
             <Activity size={15} color="#94a3b8" /> {range} <ChevronDown size={14} color="#94a3b8" />
           </button>
-          <button style={{ border: "1px solid #e2e8f0", borderRadius: 20, padding: 8, background: "white", cursor: "pointer" }}>
-            <Bell size={15} color="#475569" />
-          </button>
+          <AdminNotificationBell />
           <div style={{ display: "flex", alignItems: "center", gap: 8, border: "1px solid #e2e8f0", borderRadius: 20, padding: "6px 12px" }}>
             <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#0369a1", color: "white", display: "grid", placeItems: "center", fontSize: 12, fontWeight: 700 }}>
               {adminEmail[0].toUpperCase()}
