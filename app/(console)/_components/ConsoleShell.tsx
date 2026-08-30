@@ -7,6 +7,7 @@ import {
   Activity, Bell, BookPlus, Boxes, ChevronDown, ClipboardCheck,
   Filter, GraduationCap, LayoutGrid, LogOut, Menu, Search, Settings, Users, X,
   BookMarked, Check, Trash2,
+  RefreshCw, Banknote, ShieldCheck, BarChart3, PackageX, History, ScanSearch,
 } from "lucide-react";
 import { cn } from "./ui";
 import { ConsoleProvider, useConsole } from "./ConsoleContext";
@@ -29,6 +30,23 @@ function SideLink({ href, icon, label, onClick }: { href: string; icon: React.Re
       <span className={cn(active ? "text-sky-800" : "text-white/90")}>{icon}</span>
       <span className="flex-1 text-left">{label}</span>
     </Link>
+  );
+}
+
+function SideSection({ label }: { label: string }) {
+  return (
+    <div
+      style={{
+        padding: "14px 12px 6px",
+        fontSize: 10,
+        fontWeight: 700,
+        letterSpacing: "0.09em",
+        textTransform: "uppercase",
+        color: "rgba(255,255,255,0.55)",
+      }}
+    >
+      {label}
+    </div>
   );
 }
 
@@ -293,6 +311,8 @@ export default function ConsoleShell({ title, subtitle, children, rightActions }
     );
   }
 
+  const closeDrawer = () => setSidebarOpen(false);
+
   const sidebarContent = (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       {/* Logo */}
@@ -313,15 +333,33 @@ export default function ConsoleShell({ title, subtitle, children, rightActions }
       </div>
 
       {/* Nav */}
-      <nav style={{ padding: 12, flex: 1 }}>
-        <SideLink href="/dashboard" icon={<LayoutGrid size={16} />} label="Dashboard" onClick={() => setSidebarOpen(false)} />
-        <SideLink href="/members" icon={<Users size={16} />} label="Members" onClick={() => setSidebarOpen(false)} />
-        <SideLink href="/add-books" icon={<BookPlus size={16} />} label="Add Books" onClick={() => setSidebarOpen(false)} />
-        <SideLink href="/checkout" icon={<ClipboardCheck size={16} />} label="Check-out Books" onClick={() => setSidebarOpen(false)} />
-        <SideLink href="/inventory" icon={<Boxes size={16} />} label="Inventory" onClick={() => setSidebarOpen(false)} />
-        <SideLink href="/thesis" icon={<GraduationCap size={16} />} label="Thesis Management" onClick={() => setSidebarOpen(false)} />
+      <nav style={{ padding: 12, flex: 1, overflowY: "auto" }}>
+        <SideLink href="/dashboard" icon={<LayoutGrid size={16} />} label="Dashboard" onClick={closeDrawer} />
+
+        <SideSection label="Circulation" />
+        <SideLink href="/checkout" icon={<ClipboardCheck size={16} />} label="Issue / Return" onClick={closeDrawer} />
+        <SideLink href="/reservations" icon={<BookMarked size={16} />} label="Reservations" onClick={closeDrawer} />
+        <SideLink href="/renewals" icon={<RefreshCw size={16} />} label="Renewals" onClick={closeDrawer} />
+        <SideLink href="/notifications" icon={<Bell size={16} />} label="Reminders" onClick={closeDrawer} />
+
+        <SideSection label="Catalogue" />
+        <SideLink href="/search" icon={<ScanSearch size={16} />} label="Advanced Search" onClick={closeDrawer} />
+        <SideLink href="/inventory" icon={<Boxes size={16} />} label="Inventory" onClick={closeDrawer} />
+        <SideLink href="/add-books" icon={<BookPlus size={16} />} label="Add Books" onClick={closeDrawer} />
+        <SideLink href="/lost-damaged" icon={<PackageX size={16} />} label="Lost & Damaged" onClick={closeDrawer} />
+        <SideLink href="/thesis" icon={<GraduationCap size={16} />} label="Thesis Repository" onClick={closeDrawer} />
+
+        <SideSection label="Members & Finance" />
+        <SideLink href="/members" icon={<Users size={16} />} label="Members" onClick={closeDrawer} />
+        <SideLink href="/fines" icon={<Banknote size={16} />} label="Fines & Payments" onClick={closeDrawer} />
+        <SideLink href="/clearance" icon={<ShieldCheck size={16} />} label="Clearance (No-Dues)" onClick={closeDrawer} />
+
+        <SideSection label="Insights" />
+        <SideLink href="/reports" icon={<BarChart3 size={16} />} label="Reports & Analytics" onClick={closeDrawer} />
+        <SideLink href="/audit" icon={<History size={16} />} label="Audit Trail" onClick={closeDrawer} />
+
         <div style={{ borderTop: "1px solid rgba(255,255,255,0.2)", margin: "12px 0" }} />
-        <SideLink href="/settings" icon={<Settings size={16} />} label="Settings" onClick={() => setSidebarOpen(false)} />
+        <SideLink href="/settings" icon={<Settings size={16} />} label="Settings" onClick={closeDrawer} />
       </nav>
 
       {/* Logout */}
@@ -340,7 +378,18 @@ export default function ConsoleShell({ title, subtitle, children, rightActions }
 
         {/* DESKTOP sidebar — always in DOM, static */}
         {isDesktop && (
-          <aside style={{ width: 280, minWidth: 280, background: "#0369a1", flexShrink: 0 }}>
+          <aside
+            style={{
+              width: 280,
+              minWidth: 280,
+              background: "#0369a1",
+              flexShrink: 0,
+              position: "sticky",
+              top: 0,
+              height: "100vh",
+              overflow: "hidden",
+            }}
+          >
             {sidebarContent}
           </aside>
         )}
