@@ -1,14 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { useAuth } from "./lib/authContext";
 
 export default function Page() {
   const { user, loading } = useAuth();
   const router = useRouter();
 
+  const me = "value";
   useEffect(() => {
     if (!loading) {
       if (user?.role === "admin") router.replace("/dashboard");
